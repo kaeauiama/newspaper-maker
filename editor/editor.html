@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>機関紙エディタ</title>
+<link rel="stylesheet" href="../engine/newsletter.css">
+<link rel="stylesheet" href="editor.css">
+<script>
+  // 画面の明るさ(このブラウザだけの好み。既定は暗い画面)。描く前に当てて、ちらつかないようにする
+  try { document.documentElement.dataset.theme = localStorage.getItem('ysm-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }
+</script>
+<script type="module" src="editor.js"></script>
+</head>
+<body class="editor" data-ws="shimen">
+<header id="appbar">
+  <div class="ab-left">
+    <button type="button" id="issue-btn" class="issue-btn" data-cmd="issue" aria-haspopup="dialog" aria-expanded="false" title="号数・発行年月を直す">
+      <span class="app-mark" aria-hidden="true">紙</span>
+      <span class="issue-text"><strong id="issue-title">機関紙</strong><span id="issue-date"></span></span>
+    </button>
+    <span id="status" class="savestate"></span>
+    <button type="button" data-cmd="save" class="small" title="保存(Ctrl+S)">保存</button>
+  </div>
+  <nav id="ws-nav" aria-label="作業の画面">
+    <button type="button" data-ws="genko" title="原稿を集める(Alt+1)">原稿<span class="ws-sub" data-ws-sub="genko"></span></button>
+    <button type="button" data-ws="shimen" title="紙面を組む(Alt+2)">紙面<span class="ws-sub" data-ws-sub="shimen"></span></button>
+    <button type="button" data-ws="nyuko" title="仕上げて入稿する(Alt+3)">入稿<span class="ws-sub" data-ws-sub="nyuko"></span></button>
+  </nav>
+  <div class="ab-right">
+    <button type="button" data-cmd="theme" class="icon" aria-label="明るい画面にする" title="明るい画面にする"></button>
+    <button type="button" data-cmd="help" class="icon" aria-label="使い方とショートカット" title="使い方とショートカット" aria-haspopup="dialog" aria-expanded="false">
+      <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14M12 17.2v.1"/></svg>
+    </button>
+  </div>
+</header>
+
+<div id="issue-pop" class="popover" role="dialog" aria-label="号の情報" hidden>
+  <label>号数<input type="number" min="0" data-meta="number"></label>
+  <label>発行年月<input type="text" data-meta="date" placeholder="例: 令和8年10月"></label>
+  <button type="button" data-cmd="publication" class="pop-wide">紙名と題字の設定…</button>
+  <p class="hint where" id="storage-where"></p>
+  <button type="button" data-cmd="switch-issue" class="pop-wide static-only">ほかの号を開く…</button>
+  <button type="button" data-cmd="signout" class="pop-wide onedrive-only">OneDrive からサインアウト</button>
+</div>
+<div id="help-pop" class="popover help-pop" role="dialog" aria-label="使い方" hidden></div>
+<div id="checks-pop" class="popover checks-pop" role="dialog" aria-label="検査の結果" hidden></div>
+<div id="photo-pop" class="popover photo-pop" role="dialog" aria-label="号の写真から追加" hidden></div>
+
+<div id="workspaces">
+  <section id="ws-shimen" class="ws" aria-label="紙面">
+    <div id="toolbar" class="toolbar">
+      <button type="button" data-cmd="undo" class="icon" aria-label="元に戻す(Ctrl+Z)" title="元に戻す(Ctrl+Z)">
+        <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      </button>
+      <button type="button" data-cmd="redo" class="icon" aria-label="やり直す(Ctrl+Y)" title="やり直す(Ctrl+Y)">
+        <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+      </button>
+      <span class="tsep"></span>
+      <span class="tlabel">置く</span>
+      <button type="button" data-cmd="add-panel" class="tool" title="写真パネルを空いている場所に置く">
+        <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5L5 20"/></svg><span>写真パネル</span>
+      </button>
+      <button type="button" data-cmd="add-table" class="tool" title="表のパネルを空いている場所に置く">
+        <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 10h18M3 15h18M10 4v16"/></svg><span>表</span>
+      </button>
+      <button type="button" data-cmd="add-box" class="tool" title="行事予定・お知らせなどの囲み記事を空いている場所に置く">
+        <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 9h16"/></svg><span>囲み記事</span>
+      </button>
+      <button type="button" data-cmd="add-title" class="tool" title="記事の見出し枠を置く">
+        <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="3" width="8" height="18" rx="1"/><path d="M12 7v10"/></svg><span>見出し枠</span>
+      </button>
+      <button type="button" data-cmd="add-lead" class="tool" title="記事のリード(日付・会場など)を置く">
+        <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 4v16M12 4v11M7 4v13"/></svg><span>リード</span>
+      </button>
+      <button type="button" data-cmd="add-page" class="tool" title="最後にページを足す">
+        <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M12 11v6M9 14h6"/></svg><span>ページ</span>
+      </button>
+      <span class="tsep"></span>
+      <span class="tlabel">表示</span>
+      <button type="button" data-cmd="spread" class="tool" title="印刷したときの見え方で、見開きを全画面で見る">
+        <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6c-2-1.5-5-2-8-2v14c3 0 6 .5 8 2 2-1.5 5-2 8-2V4c-3 0-6 .5-8 2z"/><path d="M12 6v14"/></svg><span>見開き</span>
+      </button>
+      <label class="tool toggle" title="本文の枠を表示する(印刷には出ない)">
+        <input type="checkbox" id="debug">
+        <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 2.5"/></svg><span>枠を表示</span>
+      </label>
+      <span class="grow"></span>
+      <button type="button" id="checks-btn" class="checks-btn" data-cmd="checks" aria-haspopup="dialog" aria-expanded="false" title="検査の結果(押すと一覧)"></button>
+    </div>
+    <div class="ws-body">
+      <aside id="pagelist" aria-label="ページと記事"></aside>
+      <main id="canvas"><div id="pages"></div></main>
+      <aside id="inspector" aria-label="選んだものの設定"></aside>
+    </div>
+  </section>
+  <section id="ws-genko" class="ws" aria-label="原稿"></section>
+  <section id="ws-nyuko" class="ws" aria-label="入稿"><div id="print-check"></div></section>
+</div>
+
+<div id="start" hidden></div>
+<div id="panel-editor" hidden></div>
+<div id="masthead-editor" hidden></div>
+<div id="spread" hidden></div>
+<div id="cleanup" hidden></div>
+<div id="banner" hidden></div>
+<div id="toast" hidden></div>
+<input type="file" id="photo-input" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden>
+<input type="file" id="photo-import" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden>
+</body>
+</html>

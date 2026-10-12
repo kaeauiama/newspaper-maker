@@ -1,0 +1,17 @@
+// 見本の紙名の設定(架空)。samples/ の見本号で使う。書き方は docs/02-input-format.md「紙名の設定」。
+// 題字の中の位置と大きさは、題字の枠の内側の左上からの mm。
+{
+  "name": "見本通信",
+  "fileName": "mihon",
+  "approver": "発行責任者",
+  "masthead": {
+    "frame": true,
+    "items": [
+      { "type": "image", "src": "brand/emblem.svg", "x": 5.15, "y": 4, "w": 24, "h": 24 },
+      { "type": "text", "text": "見本", "dir": "vertical", "font": "mincho", "weight": 700, "size": 50, "lineHeight": 1, "align": "center", "x": 8.331, "y": 36, "w": 17.639, "h": 35.278 },
+      { "type": "text", "text": "通信", "dir": "vertical", "font": "gyosho", "size": 40, "lineHeight": 1, "align": "center", "x": 10.095, "y": 77.278, "w": 14.111, "h": 28.222 },
+      { "type": "rule", "x": 0, "y": 137.743, "w": 34.3 },
+      { "type": "text", "text": "架空の団体\n見本の\n機関紙", "font": "mincho", "weight": 600, "size": 10.5, "lineHeight": 1.4, "align": "justify", "x": 3, "y": 139.643, "w": 28.3, "h": 15.558 }
+    ]
+  }
+}

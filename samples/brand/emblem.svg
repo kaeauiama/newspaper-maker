@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- 見本の紋(架空)。見本号の題字の確認用 -->
+  <circle cx="100" cy="100" r="92" fill="none" stroke="#111" stroke-width="8"/>
+  <circle cx="100" cy="100" r="78" fill="none" stroke="#111" stroke-width="3"/>
+  <path d="M42 132 L82 70 L104 102 L120 82 L158 132 Z" fill="#b8322a"/>
+  <circle cx="134" cy="62" r="12" fill="#b8322a"/>
+</svg>

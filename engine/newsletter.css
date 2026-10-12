@@ -1,0 +1,237 @@
+/* 縦組みの機関紙の型: 書体・色・部品の見た目。
+   版面の数値(寸法・文字サイズ・行送り)は spec.js が CSS 変数として渡す。ここに数値を重複させない。 */
+
+@page { size: A4; margin: 0; }
+
+:root {
+  --mincho: "Yu Mincho", "游明朝", serif;
+  --gothic: "Yu Gothic", "游ゴシック", sans-serif;
+  --gyosho: "HGP行書体", "HGPGyoshotai", "Yu Mincho", serif;
+  --ink: #111;
+  --panel: transparent;   /* 写真・表のパネルの地色。白地(第50号の Word 版のベージュは編集中に見やすくするためのものだった。D-026) */
+  --frame: #222;
+  --table-head: #d9d9d9;
+  --table-rule: #555;
+  --dan-rule: 0.2mm solid #333;            /* 段間罫 */
+  --headline-gothic: "HGSoeiKakugothicUB", "Yu Gothic", sans-serif;   /* 白抜き見出し(Office 付属の書体。なければ游ゴシック) */
+  --headline-mincho: "HGMinchoE", "Yu Mincho", serif;                 /* 文字だけの見出し(同上。なければ游明朝) */
+  --box-bg: #e8e8e8;      /* 囲み記事の地色(およそ 10% の灰) */
+  --box-head: #c9c9c9;    /* 囲み記事の見出しの帯(地色の囲み) */
+  color: var(--ink);
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+.page {
+  position: relative;
+  width: var(--page-w);
+  height: var(--page-h);
+  background: #fff;
+  overflow: hidden;
+  /* 必須: これがないと Chrome の印刷が失敗・ハングすることがある(docs/decision-log.md D-007) */
+  contain: strict;
+}
+
+/* 柱 */
+.header {
+  position: absolute;
+  left: var(--margin-left);
+  right: var(--margin-right);
+  top: var(--header-top);
+  display: flex;
+  justify-content: space-between;
+  font: var(--header-size)/1 var(--mincho);
+}
+.header .name { letter-spacing: 1.2em; margin-right: -1.2em; }
+
+/* 版面を囲む罫と、枠の下の中央のノンブル */
+.frame { position: absolute; border: var(--frame-width) solid var(--ink); pointer-events: none; }
+.folio {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--footer-bottom);
+  text-align: center;
+  font: var(--footer-size)/1 var(--mincho);
+}
+
+.item { position: absolute; }
+
+/* 本文(記事のスロットと、囲み記事の中の列は同じ組み方) */
+.slot,
+.box .bcol {
+  position: absolute;
+  writing-mode: vertical-rl;
+  overflow: hidden;
+  font: var(--body-size)/var(--body-leading) var(--mincho);
+  text-align: justify;
+  line-break: normal;     /* Word の禁則「標準」相当: 行頭の小書き仮名・長音符は許す */
+}
+.slot p, .bcol p { margin: 0; }
+.slot .excl { visibility: hidden; }      /* 段の途中まで張り出す枠を避けるための見えない float(render.js) */
+.slot .para, .bcol .para { text-indent: 1em; }
+.slot .para.cont, .bcol .para.cont { text-indent: 0; }
+/* 箇条書き(・※ などで始まる行): 1行目は字下げせず、2行目以降を1字下げる */
+.slot .li, .bcol .li { padding-inline-start: 1em; text-indent: -1em; }
+.slot .li.cont, .bcol .li.cont { text-indent: 0; }
+.slot .split, .bcol .split { text-align-last: justify; }
+.slot .subhead, .bcol .subhead { font-family: var(--gothic); font-weight: 700; }
+.tcy { text-combine-upright: all; }
+
+/* 題字(1面)。中身(画像・文字・線)は紙名の設定(publication.jsonc)で決め、題字の枠の内側に mm で置く */
+.masthead { border: 0.3mm solid var(--frame); }
+.masthead.noframe { border: 0; }
+.mh { position: absolute; }
+.mh-image { overflow: hidden; }
+.mh-image img { position: absolute; display: block; }
+.mh-image img.fit { left: 0; top: 0; width: 100%; height: 100%; object-fit: contain; }
+.mh-text { color: var(--ink); }
+.mh-text.v { writing-mode: vertical-rl; }
+.mh-text .ln { display: block; }
+.mh-text.al-start { text-align: start; }
+.mh-text.al-center { text-align: center; }
+.mh-text.al-end { text-align: end; }
+.mh-text.al-justify .ln { text-align: justify; text-align-last: justify; }
+.mh-rule { border-top: 0.3mm solid var(--frame); }
+.mh-rule.v { border-top: 0; border-left: 0.3mm solid var(--frame); }
+.mh.placeholder {
+  display: grid;
+  place-items: center;
+  border: 0.3mm dashed #999;
+  color: #888;
+  font: 7pt var(--gothic);
+  text-align: center;
+  overflow: hidden;
+}
+
+/* 段間罫 */
+.dan-rule { position: absolute; border-top: var(--dan-rule); pointer-events: none; }
+
+/* 記事の見出し枠。見た目(look)と向き(dir)を記事ごとに選ぶ */
+.titlebox {
+  writing-mode: vertical-rl;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  text-align: center;
+  font: 600 var(--title-size)/1.35 var(--mincho);   /* 大きさの正は SPEC.title.base */
+  letter-spacing: 0.42em;
+}
+.titlebox.dir-h { writing-mode: horizontal-tb; letter-spacing: 0.15em; line-height: 1.15; }   /* 横見出しは行間を詰める(帯に大きな文字が入るように) */
+/* 枠付き: 太線+細線の二重罫 */
+.titlebox.look-frame { border: 0.8mm solid var(--ink); box-shadow: inset 0 0 0 0.8mm #fff, inset 0 0 0 1.1mm var(--ink); }
+/* 白抜き: 墨ベタに白い太ゴシック */
+.titlebox.look-reverse { background: var(--ink); color: #fff; font-family: var(--headline-gothic); font-weight: 400; font-size: var(--title-size-reverse); letter-spacing: 0.22em; }
+.titlebox.look-reverse.dir-h { letter-spacing: 0.1em; }
+/* 文字だけ: 罫も地もなく、太い明朝を大きく */
+.titlebox.look-plain { font-family: var(--headline-mincho); font-weight: 400; font-size: var(--title-size-plain); letter-spacing: 0.12em; }
+
+/* 囲み記事(行事予定・お知らせなど)。見た目は 地色(既定)と 罫囲み から選ぶ */
+.box { background: var(--box-bg); }
+.box .bhead {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--box-head);
+  font: 700 11pt/1 var(--gothic);
+  letter-spacing: 0.25em;
+  white-space: nowrap;
+}
+.box.look-frame { background: #fff; border: 0.35mm solid var(--ink); }
+.box.look-frame .bhead { background: var(--ink); color: #fff; }
+
+/* リード(日付・会場など) */
+.lead {
+  writing-mode: vertical-rl;
+  overflow: hidden;
+  font: 600 10pt/1.6 var(--mincho);
+}
+.lead p { margin: 0; }
+
+/* 写真パネル */
+.panel { background: var(--panel); }
+.panel img { position: absolute; display: block; object-fit: cover; }
+.panel .ph { position: absolute; overflow: hidden; }       /* 枠 + 切り抜きの写真の枠 */
+.panel .ph img { max-width: none; }
+.panel .shadow { box-shadow: 0.6mm 0.8mm 1.6mm rgba(0, 0, 0, 0.35); }
+.panel .cap,
+.panel .ptitle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 500 10.5pt/1 var(--gothic);
+}
+.panel .ptable { position: absolute; }
+.panel table {
+  width: 100%;
+  height: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background: #fff;
+  font: 500 9pt/1.45 var(--gothic);
+}
+.panel th,
+.panel td { border: 0.2mm solid var(--table-rule); padding: 0.4mm 1mm; text-align: center; vertical-align: middle; }
+.panel th { background: var(--table-head); font-weight: 700; }
+
+/* 画面だけ: ページの並べ方・検査結果・枠の表示 */
+.guide { display: none; position: absolute; pointer-events: none; border-block: 0.2mm solid #39f; background: rgba(0, 120, 255, 0.04); }
+
+@media screen {
+  .slot.overflow, .bcol.overflow { outline: 0.7mm solid #e00; }
+  .debug .guide { display: block; }
+  .debug .slot { outline: 0.3mm dashed #d33; background: rgba(255, 0, 0, 0.04); }
+  .debug .item { outline: 0.3mm solid rgba(0, 110, 255, 0.7); }
+
+  /* プレビュー画面(engine/page.html)だけ。エディタは editor/editor.css */
+  body.preview { background: #6f6f6f; font-family: "Yu Gothic UI", system-ui, sans-serif; }
+  .preview #pages { padding: 8mm 0 8mm 320px; }
+  .preview .page { margin: 0 auto 8mm; box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35); }
+
+  #ysm-report {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    width: 296px;
+    max-height: calc(100vh - 20px);
+    overflow: auto;
+    padding: 12px 14px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+    font-size: 12.5px;
+    line-height: 1.55;
+    z-index: 10;
+  }
+  #ysm-report h1 { margin: 0 0 4px; font-size: 15px; }
+  #ysm-report h2 { margin: 10px 0 2px; font-size: 13px; }
+  #ysm-report ul { margin: 4px 0; padding-left: 1.1em; }
+  #ysm-report li { margin: 3px 0; }
+  #ysm-report code { font-size: 11px; background: #f2f2f2; padding: 0 3px; border-radius: 3px; }
+  #ysm-report .sum { margin: 0; font-weight: 700; }
+  #ysm-report .ok { color: #1a7f37; }
+  #ysm-report .bad, #ysm-report .e { color: #c62828; }
+  #ysm-report .w { color: #8a5a00; }
+  #ysm-report .hint { margin: 10px 0 0; color: #555; }
+}
+
+/* 画面が狭いとき: 検査結果は下に寄せ、紙面を左に詰める */
+@media screen and (max-width: 1180px) {
+  .preview #pages { padding: 4mm 0 36vh; }
+  #ysm-report { top: auto; bottom: 0; left: 0; right: 0; width: auto; max-height: 32vh; border-radius: 8px 8px 0 0; }
+}
+
+@media print {
+  #ysm-report { display: none !important; }
+  .page { break-after: page; }
+  .page:last-child { break-after: auto; }
+}

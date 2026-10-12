@@ -1,0 +1,34 @@
+// 見本号(ダミー)。記事・写真・表はすべて架空。tools/check.mjs の回帰チェックの基準にも使う。
+// 配置は第50号の1面・2面を下敷きにしている。
+{
+  "number": 0,
+  "date": "令和8年10月",
+  "pages": [
+    {
+      "template": "front",   // 1面: 右端に題字が入る
+      "items": [
+        { "type": "title", "article": "shinsa", "dan": [1, 2], "right": 38.2, "width": 11.6 },
+        { "type": "lead", "article": "shinsa", "dan": [1, 1], "right": 54.0, "width": 21.8 },
+        { "type": "panel", "dan": [1, 2], "left": 0, "width": 88.2, "caption": "見本の写真パネル(3枚)",
+          "rows": [["photos/sample-1.svg", "photos/sample-2.svg"], ["photos/sample-3.svg"]] },
+        { "type": "panel", "dan": [4, 5], "right": 1.4, "width": 143.8, "caption": "見本の写真パネル(3枚)",
+          "rows": [["photos/sample-4.svg", "photos/sample-2.svg"], ["photos/sample-3.svg"]] }
+      ]
+    },
+    {
+      "template": "inner",
+      "items": [
+        { "type": "panel", "dan": [2, 2], "left": 2.2, "width": 106.9, "title": "審査結果(見本)", "table": "results.txt" },
+        { "type": "title", "article": "gasshuku", "dan": [2, 3], "right": 1.0, "width": 11.4 },
+        { "type": "panel", "dan": [3, 3], "left": 29.6, "width": 105.9, "caption": "見本の写真パネル(1枚)",
+          "rows": [["photos/sample-3.svg"]] },
+        { "type": "panel", "dan": [4, 5], "left": 0, "width": 100, "caption": "見本の写真パネル(縦に2枚)",
+          "rows": [["photos/sample-4.svg"], ["photos/sample-2.svg"]] }
+      ]
+    }
+  ],
+  "articles": [
+    { "id": "shinsa", "file": "shinsa.txt", "start": { "page": 1, "dan": 1 } },
+    { "id": "gasshuku", "file": "gasshuku.txt", "start": { "page": 2, "dan": 2 } }
+  ]
+}
