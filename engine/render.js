@@ -2,8 +2,8 @@
 //
 // 手順: 配置物を置く → 各ページのスロットを計算 → 記事ごとに割り当て範囲を決める → 流し込む → 検査する
 
-import { SPEC, danTop, danBottom, linePitch, charPitch } from './spec.js';
-import { resolveX, itemRect, computeSlots, assignSlots, unassignedSlots, danRules } from './slots.js';
+import { SPEC, PT_MM, danTop, danBottom, linePitch, charPitch, charsPerLine } from './spec.js';
+import { resolveX, itemRect, computeSlots, assignSlots, unassignedSlots, danRules, allocateLines, boxPitch } from './slots.js';
 import { parseArticle, toInlineHtml, escapeText, countChars } from './text.js';
 import { parsePipeTable } from './table.js';
 import { layoutRows, effectiveDpi, visibleFraction, photoArea, cropPlacement, panelSpacing } from './gallery.js';
@@ -53,6 +53,37 @@ async function loadImage(url) {
 }
 
 const isVector = (src) => /\.svg$/i.test(src);
+const charsOf = (els) => [...els.map((e) => e.textContent).join('')].length;
+const pt1 = (mmValue) => Math.round((mmValue / PT_MM) * 10) / 10;
+
+// 本文を箱へ流し込む。auto(詰めて収める。D-036)なら、入りきらないぶんだけ箱に行を足して流し直す
+// (足した箱は行送りを詰めて幅いっぱいに均等に並べる。行送りは spec.body.minLeading まで)。
+// targets: [{ box, width }](width は mm)、makeBlocks: 流し込む段落を毎回作り直す関数
+// 戻り値: { leftover: 入りきらなかった段落, lines: 箱ごとの行数, pitches: 箱ごとの行送り(mm), tight: 詰めたとき { lines: 足した行数, minPt } }
+function pourFit(spec, targets, makeBlocks, auto) {
+  const pitch = linePitch(spec);
+  const minPitch = spec.body.minLeading * PT_MM;
+  const widths = targets.map((t) => t.width);
+  const run = (alloc) => {
+    const pitches = targets.map((t, i) => boxPitch(t.width, alloc.base[i], alloc.lines[i], pitch));
+    targets.forEach((t, i) => {
+      for (const c of [...t.box.children]) if (!c.classList.contains('excl')) c.remove();
+      t.box.style.lineHeight = alloc.lines[i] > alloc.base[i] ? mm(pitches[i]) : '';
+    });
+    const tight = alloc.added ? { lines: alloc.added, minPt: pt1(Math.min(...pitches)) } : null;
+    return { leftover: pour(makeBlocks(), targets.map((t) => t.box)), lines: alloc.lines, pitches, tight };
+  };
+  let alloc = allocateLines(widths, pitch, minPitch, 0);
+  let res = run(alloc);
+  // 足りない字数から足す行数を見積もって流し直す。足しても入りきらなければ、また見積もる
+  for (let round = 0; auto && res.leftover.length && round < 10; round++) {
+    const next = allocateLines(widths, pitch, minPitch, alloc.added + Math.max(1, Math.ceil(charsOf(res.leftover) / charsPerLine(spec))));
+    if (next.added === alloc.added) break;   // もう詰められない
+    alloc = next;
+    res = run(alloc);
+  }
+  return res;
+}
 
 /**
  * @param {object} o
@@ -67,7 +98,7 @@ export async function renderIssue({ root, issue, spec = SPEC, readText, assetUrl
   const errors = [];
   const warnings = [];
   const pub = publication ?? defaultPublication(spec);
-  const ctx = { spec, readText, assetUrl, pubUrl, errors, warnings };
+  const ctx = { spec, readText, assetUrl, pubUrl, errors, warnings, boxes: [] };
   applySpecVars(spec);
 
   // 1. 原稿
@@ -135,8 +166,7 @@ export async function renderIssue({ root, issue, spec = SPEC, readText, assetUrl
     warnings.push({ code: 'W_SLOT_UNASSIGNED', message: `${s.page}面 段${s.dan} の右から${s.index}番目の枠(${s.lines}行分)には、どの記事も流れません。` });
   }
 
-  // 4. 流し込み
-  const pitchPx = linePitch(spec) * MM_PX;
+  // 4. 流し込み(fit: 'auto' の記事は、入りきらなければ行間を詰めて収める。D-036)
   const report = [];
   for (const [k, r] of ranges.entries()) {
     const art = articles.get(r.id);
@@ -147,13 +177,14 @@ export async function renderIssue({ root, issue, spec = SPEC, readText, assetUrl
       pages[s.page - 1].el.appendChild(box);
       return { s, box };
     });
-    const blocks = art.parsed.blocks.map((b) => {
+    const makeBlocks = () => art.parsed.blocks.map((b) => {
       const p = document.createElement('p');
       p.className = b.type;
       p.innerHTML = toInlineHtml(b.text);
       return p;
     });
-    const leftover = pour(blocks, boxes.map((b) => b.box));
+    const fit = pourFit(spec, boxes.map(({ s, box }) => ({ box, width: s.right - s.left })), makeBlocks, art.fit === 'auto');
+    const leftover = fit.leftover;
     const where = (s) => `${s.page}面段${s.dan}`;
     const entry = {
       id: r.id,
@@ -161,22 +192,27 @@ export async function renderIssue({ root, issue, spec = SPEC, readText, assetUrl
       chars: countChars(art.parsed.blocks),
       overflowChars: 0,
       emptyLines: 0,
-      boxes: boxes.map(({ s, box }) => {
+      tight: fit.tight,   // 行間を詰めて収めたとき { lines: 足した行数, minPt: いちばん詰めた箱の行送り }
+      boxes: boxes.map(({ s, box }, i) => {
         const t = box.textContent;
-        return { page: s.page, dan: s.dan, index: s.index, lines: s.lines, chars: [...t].length, head: [...t].slice(0, 6).join(''), tail: [...t].slice(-6).join('') };
+        return { page: s.page, dan: s.dan, index: s.index, lines: fit.lines[i], chars: [...t].length, head: [...t].slice(0, 6).join(''), tail: [...t].slice(-6).join('') };
       }),
     };
     if (leftover.length) {
       const rest = leftover.map((e) => e.textContent).join('');
       entry.overflowChars = [...rest].length;
       boxes.at(-1)?.box.classList.add('overflow');
+      const head = `あと約${entry.overflowChars}字。「${[...rest].slice(0, 12).join('')}…」から`;
       errors.push({
         code: 'E_ARTICLE_OVERFLOW',
-        message: `記事「${r.id}」が入りきりません(あと約${entry.overflowChars}字。「${[...rest].slice(0, 12).join('')}…」から)。写真を小さくする、原稿を削る、次の記事の開始位置を後ろにずらす、のどれかで調整してください。`,
+        message: art.fit === 'auto'
+          ? `記事「${r.id}」が、行間を詰めても入りきりません(${fit.tight ? `${fit.tight.minPt}pt まで詰めて${fit.tight.lines}行足しました。` : ''}${head})。写真を小さくする、原稿を削る、次の記事の開始位置を後ろにずらす、のどれかで調整してください。`
+          : `記事「${r.id}」が入りきりません(${head})。行間を詰めて収める(記事の設定)、写真を小さくする、原稿を削る、次の記事の開始位置を後ろにずらす、のどれかで調整してください。`,
       });
     } else {
       const lastUsed = boxes.findLastIndex((b) => b.box.querySelector('p'));
-      entry.emptyLines = boxes.reduce((n, b, i) => n + (i > lastUsed ? b.s.lines : i === lastUsed ? Math.max(0, b.s.lines - usedLines(b.box, pitchPx)) : 0), 0);
+      const used = (i) => usedLines(boxes[i].box, fit.pitches[i] * MM_PX);
+      entry.emptyLines = boxes.reduce((n, b, i) => n + (i > lastUsed ? fit.lines[i] : i === lastUsed ? Math.max(0, fit.lines[i] - used(i)) : 0), 0);
       if (entry.emptyLines > spec.underfullLines) {
         warnings.push({ code: 'W_ARTICLE_UNDERFULL', message: `記事「${r.id}」の後ろが約${entry.emptyLines}行空いています。` });
       }
@@ -187,7 +223,8 @@ export async function renderIssue({ root, issue, spec = SPEC, readText, assetUrl
   // 本文の枠の一覧(エディタが記事の開始位置の候補に使う)
   const slotList = slots.map((s, i) => ({ page: s.page, dan: s.dan, index: s.index, lines: s.lines, left: s.left, right: s.right, article: owners[i] >= 0 ? ranges[owners[i]].id : null }));
 
-  return { errors, warnings, articles: report, pages: issue.pages.length, slots: slotList };
+  // boxes: 囲み記事ごとの収まり [{ page, item, overflowChars, tight }]
+  return { errors, warnings, articles: report, boxes: ctx.boxes, pages: issue.pages.length, slots: slotList };
 }
 
 function header(issue, pub) {
@@ -316,17 +353,25 @@ async function boxItem(it, rect, ctx, pageNo) {
     if (bottom - top < charPitch(spec)) continue;   // 1字も入らない列は作らない
     cols.push(node.appendChild(placeAt(div('bcol'), { left: pad, right: W - pad, top: top - rect.top, bottom: bottom - rect.top })));
   }
+  // 紙面に置いてから流し込む(fit: 'auto' なら、入りきらないときに行間を詰めて収める。D-036)
   const fill = () => {
-    const blocks = parsed.blocks.map((b) => {
+    const makeBlocks = () => parsed.blocks.map((b) => {
       const p = document.createElement('p');
       p.className = b.type;
       p.innerHTML = toInlineHtml(b.text);
       return p;
     });
-    const rest = pour(blocks, cols);
-    if (!rest.length) return;
-    const chars = [...rest.map((e) => e.textContent).join('')].length;
-    errors.push({ code: 'E_BOX_OVERFLOW', message: `${pageNo}面: 囲み記事「${parsed.title[0] ?? it.file}」の本文が入りきりません(あと約${chars}字)。囲みを広げるか、文章を削ってください。` });
+    const res = pourFit(spec, cols.map((box) => ({ box, width: W - 2 * pad })), makeBlocks, it.fit === 'auto');
+    const chars = charsOf(res.leftover);
+    ctx.boxes.push({ page: pageNo, item: Number(node.dataset.item), overflowChars: chars, tight: res.tight });
+    if (!res.leftover.length) return;
+    const name = parsed.title[0] ?? it.file;
+    errors.push({
+      code: 'E_BOX_OVERFLOW',
+      message: it.fit === 'auto'
+        ? `${pageNo}面: 囲み記事「${name}」の本文が、行間を詰めても入りきりません(あと約${chars}字)。囲みを広げるか、文章を削ってください。`
+        : `${pageNo}面: 囲み記事「${name}」の本文が入りきりません(あと約${chars}字)。行間を詰めて収める(囲み記事の設定)、囲みを広げる、文章を削る、のどれかで調整してください。`,
+    });
     cols.at(-1)?.classList.add('overflow');
   };
   return { node, fill };

@@ -97,7 +97,7 @@ export class PageList {
     this.list.innerHTML = issue.articles.map((a) => {
       const r = result?.articles.find((x) => x.id === a.id);
       const fit = !r ? '' : r.overflowChars ? `<span class="fit err">${r.overflowChars}字あふれ</span>`
-        : r.emptyLines > SPEC.underfullLines ? `<span class="fit warn">終わりが ${r.emptyLines}行空き</span>` : '<span class="fit ok">収まっている</span>';
+        : r.emptyLines > SPEC.underfullLines ? `<span class="fit warn">終わりが ${r.emptyLines}行空き</span>` : `<span class="fit ok">収まっている${r.tight ? '(詰めた)' : ''}</span>`;
       const on = selection?.kind === 'article' && selection.id === a.id;
       return `<button type="button" class="pl-article${on ? ' on' : ''}" data-pl-article="${esc(a.id)}"><span class="t">${esc(this.ed.articleTitle(a.id))}</span>${fit}</button>`;
     }).join('') || '<p class="hint">記事はまだありません。原稿の画面で足せます。</p>';

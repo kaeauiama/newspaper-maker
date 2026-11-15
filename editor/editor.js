@@ -293,10 +293,10 @@ class Editor {
   setItemProp(prop, value) {
     const sel = this.selection;
     if (sel?.kind !== 'item') return;
-    // 選ぶ欄(記事・見出しや囲みの見た目・向き・文字の大きさ)は1回の操作として記録する。既定値は書かない
-    if (prop === 'article' || prop === 'look' || prop === 'dir' || prop === 'size') {
+    // 選ぶ欄(記事・見出しや囲みの見た目・向き・文字の大きさ・詰めて収める)は1回の操作として記録する。既定値は書かない
+    if (prop === 'article' || prop === 'look' || prop === 'dir' || prop === 'size' || prop === 'fit') {
       const box = this.issue.pages[sel.page].items[sel.index]?.type === 'box';
-      const DEFAULTS = box ? { look: 'gray' } : { look: 'frame', dir: 'vertical', size: '' };
+      const DEFAULTS = box ? { look: 'gray', fit: '' } : { look: 'frame', dir: 'vertical', size: '' };
       let v = DEFAULTS[prop] === value ? undefined : value;
       if (prop === 'size' && v !== undefined) v = Number(v);
       this.apply((issue) => M.updateItem(issue, sel.page, sel.index, { [prop]: v }));
@@ -322,6 +322,11 @@ class Editor {
 
   setArticleStart(id, start) {
     this.apply((issue) => M.setArticleStart(issue, id, start));
+  }
+
+  // 入りきらないときは行間を詰めて収める(D-036)。1回の操作として記録する
+  setArticleFit(id, on) {
+    this.apply((issue) => M.updateArticle(issue, id, { fit: on ? 'auto' : undefined }));
   }
 
   // 記事の進み具合は1回の操作として、メモは文字の入力として記録する

@@ -18,6 +18,14 @@ const TEXT_HINT = '# 見出し、> リード、▼小見出し、・や※で始
 const head = (icon, title, sub) => `<div class="ip-head"><span class="ip-icon" aria-hidden="true">${icon}</span><div><h2>${esc(title)}</h2>${sub ? `<p class="hint">${sub}</p>` : ''}</div></div>`;
 const card = (title, body) => `<section class="card">${title ? `<h3>${title}</h3>` : ''}${body}</section>`;
 
+// 詰めて収める(D-036)の様子。r: 組版の結果(記事か囲み記事の収まり)、fit: 設定('auto' か なし)
+export function tightText(r, fit) {
+  const { lineHeight: std, minLeading: min } = SPEC.body;
+  if (r?.tight) return `行間を詰めて ${r.tight.lines}行ぶん増やしています(いちばん詰めた所で行送り ${r.tight.minPt}pt。標準は ${std}pt)。`;
+  if (fit === 'auto') return `いまは標準の行間(行送り ${std}pt)で収まっています。入りきらなくなったら、行送り ${min}pt まで詰めます。`;
+  return `入りきらないぶんだけ、広い枠から1行ずつ行を足して、行間を詰めます(行送り ${min}pt まで)。`;
+}
+
 export class Inspector {
   constructor(root, ed) {
     this.root = root;
@@ -66,7 +74,10 @@ export class Inspector {
     const title = this.ed.articleTitle(id);
     return `
       ${head(ICON.text, title, `記事(${esc(a.file)})`)}
-      ${card('', '<p class="stat" data-live="stat"></p><div class="fits" data-live="fits"></div>')}
+      ${card('', `<p class="stat" data-live="stat"></p>
+        <label class="check"><input type="checkbox" data-article-fit ${a.fit === 'auto' ? 'checked' : ''}> 入りきらないときは行間を詰めて収める</label>
+        <p class="hint" data-live="tight"></p>
+        <div class="fits" data-live="fits"></div>`)}
       ${card('始まる位置', '<div class="row start" data-live="start"></div>')}
       ${card('原稿', `
         <textarea data-text="${esc(a.file)}" spellcheck="false" aria-label="原稿">${esc(this.ed.texts.get(a.file) ?? '')}</textarea>
@@ -111,7 +122,9 @@ export class Inspector {
       return `
         ${head(ICON.box, '囲み記事', where)}
         ${size}
-        ${card('見た目', `<div class="row"><label>見た目</label><select data-prop="look">${options([['gray', '地色(薄い灰色)'], ['frame', '罫で囲む']], item.look ?? 'gray')}</select></div>`)}
+        ${card('見た目', `<div class="row"><label>見た目</label><select data-prop="look">${options([['gray', '地色(薄い灰色)'], ['frame', '罫で囲む']], item.look ?? 'gray')}</select></div>
+          <label class="check"><input type="checkbox" data-item-fit ${item.fit === 'auto' ? 'checked' : ''}> 入りきらないときは行間を詰めて収める</label>
+          <p class="hint" data-live="box-tight"></p>`)}
         ${card('原稿', `
           <textarea data-text="${esc(item.file)}" spellcheck="false" style="min-height:200px" aria-label="囲み記事の原稿">${esc(this.ed.texts.get(item.file) ?? '')}</textarea>
           <p class="hint"># の行が上の帯の見出し。・や ※ で始まる行は箇条書き(字下げしない)、▼ は小見出し、それ以外の行は1行1段落。最後に ■ は付かない。</p>
@@ -184,6 +197,8 @@ export class Inspector {
       }
       const start = this.root.querySelector('[data-live="start"]');
       if (start && !start.contains(document.activeElement)) start.innerHTML = this.startHtml(sel.id);
+      const tight = this.root.querySelector('[data-live="tight"]');
+      if (tight) tight.textContent = tightText(a, this.ed.issue.articles.find((x) => x.id === sel.id)?.fit);
       const fits = this.root.querySelector('[data-live="fits"]');
       if (fits) fits.innerHTML = this.fitsHtml(sel.id, a);
     }
@@ -196,6 +211,11 @@ export class Inspector {
       el.classList.toggle('bad', !!low);
     }
     if (sel?.kind === 'item') {
+      const boxTight = this.root.querySelector('[data-live="box-tight"]');
+      if (boxTight) {
+        const b = (result?.boxes ?? []).find((x) => x.page === sel.page + 1 && x.item === sel.index);
+        boxTight.textContent = tightText(b, this.ed.issue.pages[sel.page]?.items?.[sel.index]?.fit);
+      }
       const size = this.root.querySelector('[data-live="size"]');
       const g = this.ed.itemGeometry(sel.page, sel.index);
       if (size && g) size.textContent = `${g.label}、幅 ${g.lines}行ぶん(${g.width.toFixed(1)}mm)`;
@@ -248,7 +268,9 @@ export class Inspector {
       const get = (k) => Number(box.querySelector(`[data-start="${k}"]`).value);
       const start = { page: get('page'), dan: get('dan'), slot: t.dataset.start === 'slot' ? get('slot') : 1 };
       this.ed.setArticleStart(this.ed.selection.id, start);
-    } else if (t.dataset.prop && t.tagName === 'SELECT') this.ed.setItemProp(t.dataset.prop, t.value);
+    } else if (t.dataset.articleFit != null) this.ed.setArticleFit(this.ed.selection.id, t.checked);
+    else if (t.dataset.itemFit != null) this.ed.setItemProp('fit', t.checked ? 'auto' : '');
+    else if (t.dataset.prop && t.tagName === 'SELECT') this.ed.setItemProp(t.dataset.prop, t.value);
     else if (t.dataset.photoRow != null) this.ed.photoAction('row', Number(t.dataset.photoRow), Number(t.value));
     else if (t.dataset.photoFocus != null) this.ed.photoAction('focus', Number(t.dataset.photoFocus), t.value);
   }

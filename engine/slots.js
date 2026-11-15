@@ -89,6 +89,32 @@ export function computeSlots(spec, rects) {
   return slots;
 }
 
+// 詰めて収める(D-036): 本文の箱ごとの行数を、合わせて extra 行まで1行ずつ増やす。足すたびに、足したあとの行送りが
+// いちばん広く残る箱を選ぶ(広い箱ほど、1行足しても行送りの変わり方が小さい)ので、詰め方が1か所に偏らない。
+// どの箱も行送りを minPitch より詰めない。widths: 箱の幅(mm)、pitch: 標準の行送り(mm)
+// 戻り値: { base: 標準の行数, lines: 足したあとの行数, added: 足せた行数 }(足しきれなければ、足せるだけ足す)
+export function allocateLines(widths, pitch, minPitch, extra) {
+  const base = widths.map((w) => Math.floor(w / pitch + 1e-6));
+  const lines = [...base];
+  const after = (i) => widths[i] / (lines[i] + 1);
+  let added = 0;
+  while (added < extra) {
+    let best = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (after(i) >= minPitch - 1e-9 && (best < 0 || after(i) > after(best) + 1e-9)) best = i;
+    }
+    if (best < 0) break;
+    lines[best] += 1;
+    added += 1;
+  }
+  return { base, lines, added };
+}
+
+// 箱の行送り(mm)。行を足した箱は、幅をその行数で等分する(行が箱いっぱいに均等に並ぶ)。足していない箱は標準のまま
+export function boxPitch(width, base, lines, pitch) {
+  return lines > base ? Math.floor((width / lines) * 1000) / 1000 : pitch;
+}
+
 // 全ページのスロット(読む順)に対して、各記事の開始位置から次の記事の開始位置の手前までを割り当てる。
 // slots: [{ page, dan, index, ... }]、articles: [{ id, start: { page, dan, slot? } }](号の中の順)
 // 戻り値: { ranges: [{ id, from, to }](to は含まない), errors: [{ code, message }] }

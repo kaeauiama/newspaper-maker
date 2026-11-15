@@ -128,7 +128,7 @@ export class GenkoView {
     const where = !pages.length ? '紙面に場所がない' : pages.length === 1 ? `${pages[0]}面` : `${pages[0]}〜${pages.at(-1)}面`;
     if (r.overflowChars) return `<span class="fit err">${where} · ${r.overflowChars}字あふれ</span>`;
     if (r.emptyLines > SPEC.underfullLines) return `<span class="fit warn">${where} · 終わりが ${r.emptyLines}行空き</span>`;
-    return `<span class="fit ok">${where} · 収まっている</span>`;
+    return `<span class="fit ok">${where} · 収まっている${r.tight ? '(行間を詰めた)' : ''}</span>`;
   }
 
   // ---- 選んだ記事の原稿 ----
@@ -166,7 +166,7 @@ export class GenkoView {
     if (stat) {
       const pages = r ? [...new Set(r.boxes.map((b) => b.page))] : [];
       const where = pages.length > 1 ? `${pages[0]}〜${pages.at(-1)}面` : pages.length ? `${pages[0]}面` : '';
-      stat.textContent = !r ? '' : r.overflowChars ? `${r.chars}字・${where}で ${r.overflowChars}字あふれています` : `${r.chars}字・${where ? `${where}に収まっている(` : '('}末尾の空き ${r.emptyLines}行)`;
+      stat.textContent = !r ? '' : r.overflowChars ? `${r.chars}字・${where}で ${r.overflowChars}字あふれています` : `${r.chars}字・${where ? `${where}に収まっている(` : '('}${r.tight ? `行間を詰めて${r.tight.lines}行増やした・` : ''}末尾の空き ${r.emptyLines}行)`;
       stat.classList.toggle('bad', !!r?.overflowChars);
     }
     const title = this.$('[data-gk-live="title"]');

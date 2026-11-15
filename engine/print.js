@@ -21,7 +21,8 @@ export function contentFingerprint(issue, texts) {
     number: issue.number,
     date: issue.date,
     pages: issue.pages,
-    articles: (issue.articles ?? []).map((a) => ({ id: a.id, file: a.file, start: a.start ?? null })),
+    // fit(詰めて収める)は書いてあるときだけ入れる(書いていない号の指紋は、これまでと変わらない)
+    articles: (issue.articles ?? []).map((a) => ({ id: a.id, file: a.file, start: a.start ?? null, ...(a.fit != null ? { fit: a.fit } : {}) })),
     texts: [...texts.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
   });
   let h = 0x811c9dc5;   // FNV-1a(32 ビット)

@@ -3,7 +3,7 @@
 
 import { linePitch, charsPerLine } from '../engine/spec.js';
 import { snapResizeLeft, snapResizeRight, snapMove } from './snap.js';
-import { rectOf, setGeometry, setArticleStart } from './model.js';
+import { rectOf, setGeometry, setArticleStart, updateArticle } from './model.js';
 
 function kindName(item) {
   if (item.type === 'panel') return item.table ? '表' : '写真パネル';
@@ -21,6 +21,11 @@ export function fitCandidates(spec, issue, result, articleId) {
   const cpl = charsPerLine(spec);
   const out = [];
   const add = (label, r, cost) => { if (r && !r.error && r.issue !== issue) out.push({ label, issue: r.issue ?? r, cost }); };
+
+  // 0. 行間を詰めて収める(D-036。あふれのときだけ)。配置を変えずに済むので、効くなら先に出す
+  if (over && issue.articles.find((a) => a.id === articleId)?.fit !== 'auto') {
+    add(`行間を詰めて収める(この記事の設定。行送りは ${spec.body.minLeading}pt まで)`, updateArticle(issue, articleId, { fit: 'auto' }), 0.5);
+  }
 
   // 1. 記事が流れるページの配置物を、狭く(あふれ)・広く(空きすぎ)する、横へずらす、上か下を縮める(あふれ)
   const pages = [...new Set(art.boxes.map((b) => b.page - 1))];

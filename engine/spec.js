@@ -6,7 +6,7 @@ export const SPEC = Object.freeze({
   page: { width: 210, height: 297 },                   // A4 縦(mm)
   margin: { top: 15, right: 12.7, bottom: 15, left: 12.7 },   // 版面の外側。上下は枠と柱・ノンブルのぶん広い
   dan: { count: 5, gap: 7.5 },                          // 段数、段間(mm)
-  body: { fontSize: 11, lineHeight: 18 },               // 本文の文字サイズ、行送り(pt)
+  body: { fontSize: 11, lineHeight: 18, minLeading: 16 },   // 本文の文字サイズ、行送り、詰めて収めるとき(D-036)の行送りの下限(pt)
   wrapGap: 0.5,                                         // 配置物と本文の間隔(mm)
   frame: { offset: 3, width: 0.35 },                    // 版面を囲む罫: 版面からの距離と太さ(mm)
   danRule: { inset: 1, minLength: 3 },                  // 段間罫: 配置物との間隔、これより短い切れ端は引かない(mm)

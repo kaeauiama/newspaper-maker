@@ -44,6 +44,7 @@ export function validateIssue(issue, spec) {
     else ids.add(a.id);
     if (typeof a.file !== 'string' || !a.file) err('E_ARTICLE_FILE', `${where}: 原稿ファイル file を書いてください。`);
     if (a.status != null && !ARTICLE_STATUSES.includes(a.status)) err('E_ARTICLE_STATUS', `${where}: status(進み具合)は ${ARTICLE_STATUSES.join(' / ')} のどれかです。`);
+    if (a.fit != null && a.fit !== 'auto') err('E_ARTICLE_FIT', `${where}: fit に書けるのは "auto"(入りきらないときは行間を詰めて収める)だけです。`);
   });
 
   const pages = Array.isArray(issue.pages) ? issue.pages : [];
@@ -101,6 +102,7 @@ export function validateIssue(issue, spec) {
         if (typeof it.file !== 'string' || !it.file) err('E_BOX_FILE', `${label}: 囲み記事の原稿ファイル file を書いてください。`);
         if (it.look != null && !BOX_LOOKS.includes(it.look)) err('E_ITEM_LOOK', `${label}: look は ${BOX_LOOKS.join(' / ')} のどちらかです。`);
       }
+      if (it.fit != null && !(it.type === 'box' && it.fit === 'auto')) err('E_ITEM_FIT', `${label}: fit は囲み記事にだけ、"auto"(入りきらないときは行間を詰めて収める)と書けます。`);
       if (it.type === 'panel') {
         const n = [it.photos, it.rows, it.table].filter((v) => v != null).length;
         if (n === 0) err('E_PANEL_EMPTY', `${label}: photos・rows・table のどれかを書いてください。`);

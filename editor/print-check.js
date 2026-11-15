@@ -79,6 +79,11 @@ export class PrintCheck {
       lowPhotos,
       others: warnings.filter((w) => !(w.code === 'W_IMAGE_LOW_DPI' && w.src) && w.code !== 'W_APPROVAL_CHANGED'),
       notFixed: issue.articles.filter((a) => a.status !== 'fixed'),
+      // 行間を詰めて収めたもの(D-036。問題ではないが、刷る前に見え方を確かめたい)
+      tight: [
+        ...(result?.articles ?? []).filter((a) => a.tight).map((a) => ({ name: this.ed.articleTitle(a.id), ...a.tight })),
+        ...(result?.boxes ?? []).filter((b) => b.tight).map((b) => ({ name: `${b.page}面の囲み記事`, ...b.tight })),
+      ],
       pages: issue.pages.length,
       sides: imposition(issue.pages.length),
       print: { ...PRINT_DEFAULTS, ...(issue.print ?? {}) },
@@ -146,6 +151,8 @@ export class PrintCheck {
     s.lowPhotos.length ? `<div class="nk-thumbs">${s.lowPhotos.map((w) => `<figure><img src="${esc(this.ed.api.url(w.src))}" alt=""><figcaption>${esc(w.src.replace(/^photos\//, ''))}<br>約${w.dpi}dpi</figcaption></figure>`).join('')}</div>` : '')}
               ${item('others', !s.others.length, s.others.length ? `そのほかの警告が ${s.others.length} 件あります` : 'そのほかの警告はありません',
     s.others.length ? `<details><summary>一覧</summary>${list(s.others.map((w) => `<li><code>${esc(w.code)}</code>${esc(w.message)}</li>`))}</details>` : '')}
+              ${s.tight.length ? item('tight', true, `行間を詰めて収めたものが ${s.tight.length} つあります(刷ったもので、読みにくくないかを確かめてください)`,
+    list(s.tight.map((t) => `<li>${esc(t.name)}(${t.lines}行増やした・いちばん詰めた所で行送り ${t.minPt}pt)</li>`))) : ''}
             </ul>
           </section>
 
