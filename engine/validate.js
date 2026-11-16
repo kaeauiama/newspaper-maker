@@ -113,6 +113,11 @@ export function validateIssue(issue, spec) {
           }
         }
       }
+      // 表のパネルの列の幅と1列目(D-037)
+      if (it.cols != null && !(it.table && Array.isArray(it.cols) && it.cols.length && it.cols.every((w) => typeof w === 'number' && w > 0))) {
+        err('E_TABLE_COLS', `${label}: cols(表の列の幅)は、表のパネルにだけ、列ごとの幅の比を正の数の並びで書けます(例: [2, 1, 1])。`);
+      }
+      if (it.headCol != null && !(it.table && typeof it.headCol === 'boolean')) err('E_TABLE_HEAD_COL', `${label}: headCol(1列目を見出しにするか)は、表のパネルにだけ true か false で書けます。`);
       placed.push({ item: it, label });
     });
     for (let a = 0; a < placed.length; a++) {

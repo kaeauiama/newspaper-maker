@@ -409,7 +409,7 @@ async function panelBox(it, rect, ctx, pageNo) {
   if (it.table) {
     const wrap = placeAt(div('ptable'), { left: inner.x, right: inner.x + inner.w, top: inner.y, bottom: inner.y + inner.h });
     try {
-      wrap.appendChild(tableElement(parsePipeTable(await readText(it.table))));
+      wrap.appendChild(tableElement(parsePipeTable(await readText(it.table)), it, warnings, pageNo));
     } catch {
       errors.push({ code: 'E_FILE_NOT_FOUND', message: `${pageNo}面: 表のファイル ${it.table} を読めません。` });
     }
@@ -477,16 +477,30 @@ async function panelBox(it, rect, ctx, pageNo) {
   return el;
 }
 
-function tableElement(t) {
+// 表。見出しは区切り行より上の行と、1列目(パネルの headCol: false なら1列目は見出しにしない)。
+// 列の幅はパネルの cols(列ごとの比。書かなければ均等。D-037)
+function tableElement(t, it, warnings, pageNo) {
   const table = document.createElement('table');
+  for (const p of t.problems) warnings.push({ ...p, message: `${pageNo}面: ${p.message}` });
+  if (Array.isArray(it.cols)) {
+    if (it.cols.length === t.cols) {
+      const sum = it.cols.reduce((a, b) => a + b, 0);
+      const group = document.createElement('colgroup');
+      for (const w of it.cols) group.appendChild(Object.assign(document.createElement('col'), { style: `width: ${+((w / sum) * 100).toFixed(3)}%` }));
+      table.appendChild(group);
+    } else {
+      warnings.push({ code: 'W_TABLE_COLS', message: `${pageNo}面: 表の列の幅(cols)が ${it.cols.length}列ぶんですが、表は ${t.cols}列です。列の幅をそろえて組みます(表の編集の画面で直してください)。` });
+    }
+  }
   t.rows.forEach((row, i) => {
     const tr = table.insertRow();
-    row.forEach((cell, j) => {
-      const c = document.createElement(i < t.headerRows || j === 0 ? 'th' : 'td');
+    for (const cell of row) {
+      const c = document.createElement(i < t.headerRows || (it.headCol !== false && cell.col === 0) ? 'th' : 'td');
       c.colSpan = cell.colspan;
+      if (cell.rowspan > 1) c.rowSpan = cell.rowspan;
       c.innerHTML = cell.lines.map(escapeText).join('<br>');
       tr.appendChild(c);
-    });
+    }
   });
   return table;
 }

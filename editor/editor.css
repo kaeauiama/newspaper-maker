@@ -266,7 +266,10 @@ label.tool:has(input:focus-visible) { outline: 2px solid var(--ui-accent); outli
 /* ---- 紙面の画面 ---- */
 
 #ws-shimen { display: grid; grid-template-rows: auto minmax(0, 1fr); }
-.ws-body { display: grid; grid-template-columns: 164px minmax(0, 1fr) 340px; min-height: 0; }
+.ws-body { position: relative; display: grid; grid-template-columns: 164px minmax(0, 1fr) var(--inspector-w, 340px); min-height: 0; }
+/* 右の欄の幅を変える境目(editor/pane-resize.js) */
+.ws-resize { position: absolute; top: 0; bottom: 0; right: calc(var(--inspector-w, 340px) - 4px); z-index: 6; width: 8px; cursor: col-resize; }
+.ws-resize:hover, .ws-resize.on, .ws-resize:focus-visible { background: linear-gradient(90deg, transparent 3px, var(--ui-accent) 3px, var(--ui-accent) 5px, transparent 5px); outline: none; }
 #pagelist { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; padding: 10px; background: var(--ui-panel); border-right: 1px solid var(--ui-line); }
 #canvas { position: relative; overflow: auto; background: var(--ui-bg); }
 #inspector { min-height: 0; overflow: auto; padding: 14px 14px 40px; background: var(--ui-panel); border-left: 1px solid var(--ui-line); }
@@ -560,6 +563,28 @@ label.tool:has(input:focus-visible) { outline: 2px solid var(--ui-accent); outli
 .pe-cropbox { position: absolute; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); outline: 1px solid #fff; cursor: move; }
 .pe-cropbox .pe-h { width: 14px; height: 14px; margin: -7px 0 0 -7px; border-width: 2px; }
 
+/* ---- 表の編集(editor/table-editor.js)。枠と帯は紙名と題字の設定と同じ ---- */
+
+#table-editor { position: fixed; inset: 0; z-index: 31; display: grid; place-items: center; background: rgba(10, 11, 13, 0.72); }
+.te-box { grid-template-rows: auto minmax(0, 1fr) auto; }
+.te-main { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; padding: 16px 24px 24px; background: var(--ui-bg); }
+.te-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.te-opts label { display: flex; align-items: center; gap: 8px; }
+.te-sheet { width: 100%; }
+.te-ruler { position: relative; height: 22px; margin: 0 auto 4px; color: var(--ui-muted); font-size: 11px; }
+.te-ruler .te-w { position: absolute; top: 0; height: 100%; display: grid; place-items: center; border-bottom: 1px solid var(--ui-line-strong); }
+.te-ruler .te-h { position: absolute; top: 0; z-index: 1; width: 11px; height: 100%; margin-left: -5px; cursor: col-resize; background: linear-gradient(90deg, transparent 4px, var(--ui-accent) 4px, var(--ui-accent) 7px, transparent 7px); }
+/* 升目は、紙面と同じ大きさ(mm)のパネルの中に、紙面と同じ規則(newsletter.css の .panel の表)で組み、zoom で拡大する。
+   ここでは選んでいるセルと、表の範囲(点線)だけを足す */
+.te-paper { width: fit-content; margin: 0 auto; }
+.te-area { position: relative; background: #fff; color: var(--ink); outline: 0.25mm dashed #888; outline-offset: 0.4mm; }
+.te-area.over { outline: 0.4mm solid var(--ui-err); }
+.te-grid :is(td, th).te-sel { box-shadow: inset 0 0 0 0.45mm var(--ui-accent); background-color: #e3efff; }
+.te-grid th.te-sel { background-color: #c9d9ef; }
+.te-cell { white-space: pre-line; outline: none; cursor: text; }
+.te-fit { margin: 10px auto 0; color: var(--ui-muted); font-size: 12px; text-align: center; }
+.te-fit.bad { color: var(--ui-err); }
+
 /* ---- 紙名と題字の設定(editor/masthead-editor.js) ---- */
 
 #masthead-editor { position: fixed; inset: 0; z-index: 31; display: grid; place-items: center; background: rgba(10, 11, 13, 0.72); }
@@ -711,16 +736,20 @@ body:not([data-storage="onedrive"]) .onedrive-only { display: none; }
 
 /* 紙面(210mm)が欄にはさまれて入りきらない幅では、左の欄(ページの一覧)を畳む */
 @media (max-width: 1340px) {
-  .ws-body { grid-template-columns: minmax(0, 1fr) 340px; }
+  .ws-body { grid-template-columns: minmax(0, 1fr) var(--inspector-w, 340px); }
   #pagelist { display: none; }
 }
 @media (max-width: 1180px) {
-  .ws-body { grid-template-columns: minmax(0, 1fr) 300px; }
+  .ws-body { grid-template-columns: minmax(0, 1fr) var(--inspector-w, 300px); }
+  .ws-resize { right: calc(var(--inspector-w, 300px) - 4px); }
   .gk-body, .nk { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 860px) {
   #appbar { grid-template-columns: minmax(0, 1fr) auto; }
   #ws-nav { grid-column: 1 / -1; grid-row: 2; justify-self: center; margin-bottom: 8px; }
   .ws-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .ws-resize { display: none; }
   #inspector { max-height: 40vh; border-left: 0; border-top: 1px solid var(--ui-line); }
 }
+#inspector details.raw { margin-top: 8px; }
+#inspector details.raw summary { cursor: pointer; color: var(--ui-muted); font-size: 12px; }

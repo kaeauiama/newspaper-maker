@@ -23,6 +23,8 @@ import { Shell } from './shell.js';
 import { PageList } from './pagelist.js';
 import { GenkoView } from './genko.js';
 import { MastheadEditor } from './masthead-editor.js';
+import { TableEditor } from './table-editor.js';
+import { setupPaneResize } from './pane-resize.js';
 import { printPages } from './printing.js';
 import { printFiles } from '../engine/print.js';
 
@@ -84,6 +86,7 @@ class Editor {
     this.genko = new GenkoView(this);    // 原稿の画面
     this.panelEditor = new PanelEditor(this);
     this.mastheadEditor = new MastheadEditor(this);   // 紙名と題字の設定
+    this.tableEditor = new TableEditor(this);         // 表の編集
     this.spread = new SpreadPreview(this);
     this.printCheck = new PrintCheck(this);
     this.cleanup = new TextCleanup(this);
@@ -277,6 +280,28 @@ class Editor {
     this.endTextSession();
     this.checkpoint();
     this.texts = new Map(this.texts).set(file, value);
+    this.inspector.update(true);
+    this.genko.update(true);
+    this.scheduleRender(0);
+    this.updateStatus();
+  }
+
+  // 画面の中のボタンでページを移る(読み直す)。保存していない変更があれば先に尋ね、そのあとはブラウザに尋ねさせない
+  leavePage(go, what) {
+    if (this.dirtyFiles().length && !confirm(`保存していない変更があります。捨てて${what}ますか?`)) return false;
+    this.leaving = true;
+    go();
+    return true;
+  }
+
+  // 表の編集の画面の結果。表の原稿ファイルとパネルの設定(列の幅など)を、まとめて1回の操作として当てる
+  applyTable(p, i, file, text, props) {
+    this.endTextSession();
+    const issue = M.updateItem(this.issue, p, i, props);
+    if (text === this.texts.get(file) && JSON.stringify(issue) === JSON.stringify(this.issue)) return;
+    this.checkpoint();
+    this.issue = issue;
+    this.texts = new Map(this.texts).set(file, text);
     this.inspector.update(true);
     this.genko.update(true);
     this.scheduleRender(0);
@@ -686,6 +711,12 @@ class Editor {
         this.mastheadEditor.open();
         return;
       }
+      const table = e.target.closest('.item.panel[data-item]');
+      const tp = table && Number(table.closest('.page').dataset.page) - 1;
+      if (table && this.issue.pages[tp].items[Number(table.dataset.item)]?.table) {
+        this.tableEditor.open(tp, Number(table.dataset.item));
+        return;
+      }
       const panel = this.photoPanelAt(e.target);
       if (panel) this.panelEditor.open(panel.page, panel.index);
     });
@@ -693,8 +724,11 @@ class Editor {
     canvas.addEventListener('dragleave', (e) => { if (!canvas.contains(e.relatedTarget)) this.setDropTarget(null); });
     canvas.addEventListener('drop', (e) => this.onDrop(e));
     window.addEventListener('keydown', (e) => this.onKey(e));
+    setupPaneResize(document.querySelector('#ws-shimen .ws-body'));
+    // ページを離れるときは、保存していない変更がなくても必ずブラウザに尋ねさせる(ブックマークなどをうっかり押したときに戻れるように。D-038)。
+    // 画面の中のボタンで移るとき(ほかの号を開く・サインアウトなど)は、leavePage で先に尋ねてから移る
     window.addEventListener('beforeunload', (e) => {
-      if (this.dirtyFiles().length && !this.leaving) {
+      if (!this.leaving) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -896,6 +930,10 @@ class Editor {
     const key = e.key.toLowerCase();
     if (this.mastheadEditor.isOpen) {
       this.mastheadEditor.onKey(e);
+      return;
+    }
+    if (this.tableEditor.isOpen) {
+      this.tableEditor.onKey(e);
       return;
     }
     if (ctrl && key === 's') {
@@ -1273,13 +1311,9 @@ class Editor {
     else if (cmd === 'theme') this.shell.toggleTheme();
     else if (cmd === 'help') this.shell.toggle('help');
     else if (cmd === 'issue') this.shell.toggle('issue');
-    else if (cmd === 'switch-issue') location.reload();   // 静的ページ版: はじめの画面へ(保存していない変更があればブラウザが尋ねる)
-    else if (cmd === 'signout') {
-      // トークンを先に消すので、ブラウザの「このサイトを離れますか」で止められると保存できなくなる。ここで先に尋ねる
-      if (this.dirtyFiles().length && !confirm('保存していない変更があります。捨ててサインアウトしますか?')) return;
-      this.leaving = true;
-      this.api.signOut?.();
-    }
+    else if (cmd === 'switch-issue') this.leavePage(() => location.reload(), 'ほかの号を開き');   // 静的ページ版: はじめの画面へ
+    // サインアウトはトークンを先に消すので、ブラウザの「このサイトを離れますか」で止められると保存できなくなる。ここで先に尋ねる
+    else if (cmd === 'signout') this.leavePage(() => this.api.signOut?.(), 'サインアウトし');
     else if (cmd === 'publication') {
       this.shell.close();
       this.mastheadEditor.open();
@@ -1403,7 +1437,7 @@ class Editor {
   // names: 'issue/…'(号のフォルダ)・'workspace/…'(紙名の設定と題字の画像)・'engine/…'・'editor/…'
   onExternalChange(names) {
     if (names.some((n) => n.startsWith('engine/') || n.startsWith('editor/'))) {
-      this.banner('エディタや型のファイルが更新されました。', '再読み込み', () => location.reload());
+      this.banner('エディタや型のファイルが更新されました。', '再読み込み', () => this.leavePage(() => location.reload(), '読み直し'));
     }
     // 紙名の設定と題字の画像(号のフォルダの1つ上)
     if (names.some((n) => n === 'workspace/publication.jsonc' || n.startsWith('workspace/brand/'))) {
@@ -1463,7 +1497,7 @@ async function main() {
   await ed.genko.loadFiles();
   await ed.render();
   ed.listen();
-  if (api.kind === 'demo') ed.banner('見本を開いています。直したものは保存されません(ページを閉じると消えます)。', 'はじめの画面へ', () => location.reload());
+  if (api.kind === 'demo') ed.banner('見本を開いています。直したものは保存されません(ページを閉じると消えます)。', 'はじめの画面へ', () => ed.leavePage(() => location.reload(), 'はじめの画面へ戻り'));
 }
 
 main();

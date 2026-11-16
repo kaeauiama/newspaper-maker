@@ -139,8 +139,12 @@ export class Inspector {
           <label class="field">上の見出し<input type="text" data-prop="title" value="${esc(item.title)}"></label>
           <label class="field">キャプション<input type="text" data-prop="caption" value="${esc(item.caption)}"></label>`)}
         ${card('表', `
-          <textarea data-text="${esc(item.table)}" spellcheck="false" style="min-height:160px" aria-label="表">${esc(this.ed.texts.get(item.table) ?? '')}</textarea>
-          <p class="hint">| で区切って書きます。|---| の行より上が見出し行。セルが「&lt;」だけなら左と結合、&lt;br&gt; で改行。</p>`)}
+          <div class="actions"><button type="button" class="primary" data-act="edit-table" title="升目に直接書き、行・列の足し引き、セルの結合、列の幅を決める(表をダブルクリックしても開く)">${ICON.table}表を編集…</button></div>
+          <p class="hint">列の幅: ${item.cols ? '決めてある' : '均等'}。1列目: ${item.headCol === false ? '見出しにしない' : '見出し'}。</p>
+          <details class="raw"><summary>テキストで直す</summary>
+            <textarea data-text="${esc(item.table)}" spellcheck="false" style="min-height:160px" aria-label="表">${esc(this.ed.texts.get(item.table) ?? '')}</textarea>
+            <p class="hint">| で区切って書きます。|---| の行より上が見出し行。セルが「&lt;」だけなら左と、「^」だけなら上と結合、&lt;br&gt; で改行。</p>
+          </details>`)}
         ${foot}`;
     }
     const photos = photoList(item);
@@ -296,6 +300,7 @@ export class Inspector {
     else if (act === 'apply-fit') this.ed.applyFit(id, Number(b.dataset.n));
     else if (act === 'auto-arrange') this.ed.autoArrange();
     else if (act === 'edit-panel') this.ed.panelEditor.open(this.ed.selection.page, this.ed.selection.index);
+    else if (act === 'edit-table') this.ed.tableEditor.open(this.ed.selection.page, this.ed.selection.index);
     else if (act === 'photo-up') this.ed.photoAction('move', n, -1);
     else if (act === 'photo-down') this.ed.photoAction('move', n, +1);
     else if (act === 'photo-remove') this.ed.photoAction('remove', n);
